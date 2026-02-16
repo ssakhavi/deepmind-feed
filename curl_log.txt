@@ -1,0 +1,29 @@
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0* Host export.arxiv.org:80 was resolved.
+* IPv6: (none)
+* IPv4: 199.232.47.42
+*   Trying 199.232.47.42:80...
+* Connected to export.arxiv.org (199.232.47.42) port 80
+> GET /api/query?search_query=ti:Intelligent+AI+Delegation HTTP/1.1
+> Host: export.arxiv.org
+> User-Agent: curl/8.5.0
+> Accept: */*
+> 
+< HTTP/1.1 301 Moved Permanently
+< Connection: close
+< Content-Length: 0
+< Server: Varnish
+< Retry-After: 0
+< Location: https://export.arxiv.org/api/query?search_query=ti:Intelligent+AI+Delegation
+< Accept-Ranges: bytes
+< Date: Mon, 16 Feb 2026 13:36:43 GMT
+< Via: 1.1 varnish
+< X-Served-By: cache-qpg1251-QPG
+< X-Cache: HIT
+< X-Cache-Hits: 0
+< X-Timer: S1771249003.246946,VS0,VE0
+< Strict-Transport-Security: max-age=300
+< 
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+* Closing connection
