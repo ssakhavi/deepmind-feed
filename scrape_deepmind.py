@@ -58,14 +58,20 @@ def scrape_deepmind_publications():
     return publications
 
 def scrape_arxiv_papers():
-    # Query for papers where author is "DeepMind" or "Google DeepMind"
-    # sort by submittedDate descending
-    # We'll fetch top 20 to be safe
+    # Broad query for recent papers in relevant categories
+    # cs.AI: Artificial Intelligence
+    # cs.LG: Machine Learning
+    # cs.CV: Computer Vision
+    # cs.RO: Robotics
+    # stat.ML: Machine Learning (Stats)
+    query = 'cat:cs.AI OR cat:cs.LG OR cat:cs.CV OR cat:cs.RO OR cat:stat.ML'
+    
+    print(f"Querying ArXiv for recent papers: {query}")
     base_url = "http://export.arxiv.org/api/query"
     params = {
-        "search_query": 'all:"Google DeepMind"',
+        "search_query": query,
         "start": 0,
-        "max_results": 20,
+        "max_results": 100,  # Fetch last 100 papers
         "sortBy": "submittedDate",
         "sortOrder": "descending"
     }
@@ -78,53 +84,83 @@ def scrape_arxiv_papers():
         return []
 
     root = ET.fromstring(response.content)
-    # Atom namespace
     ns = {'atom': 'http://www.w3.org/2005/Atom'}
     
     papers = []
     
     for entry in root.findall('atom:entry', ns):
-        title_elem = entry.find('atom:title', ns)
-        if title_elem is not None and title_elem.text is not None:
-            title = title_elem.text.strip().replace('\n', ' ')
-        else:
-            title = "No Title"
-        
         link_elem = entry.find('atom:id', ns)
         if link_elem is not None and link_elem.text is not None:
             link = link_elem.text
         else:
             link = ""
         
+        title_elem = entry.find('atom:title', ns)
+        title = title_elem.text.strip().replace('\n', ' ') if title_elem is not None and title_elem.text else "No Title"
+
+        # Check metadata first
+        is_deepmind = False
+        
+        # Check title/summary for "DeepMind" (sometimes listed in text)
         summary_elem = entry.find('atom:summary', ns)
-        if summary_elem is not None and summary_elem.text is not None:
-            summary = summary_elem.text.strip()
-        else:
-            summary = ""
+        summary = summary_elem.text.strip() if summary_elem is not None and summary_elem.text else ""
         
-        published_elem = entry.find('atom:published', ns)
-        if published_elem is not None and published_elem.text is not None:
-            published_str = published_elem.text
-        else:
-            published_str = ""
+        if "DeepMind" in summary or "DeepMind" in title:
+            is_deepmind = True
+            
+        # Check authors/affiliations if available in metadata (ArXiv API often lacks explicit affiliation fields but check likely places)
+        # Note: default ArXiv API doesn't always return affiliation. 
+        # But if "Google DeepMind" is in the author list string (unlikely in standard Atom, but checks just in case)
+        for author in entry.findall('atom:author', ns):
+            name = author.find('atom:name', ns)
+            if name is not None and name.text and "DeepMind" in name.text:
+                is_deepmind = True
+                break
         
-        # Parse date: 2026-02-12T17:42:37Z
-        pub_date = datetime.datetime.now()
-        if published_str:
+        # If not found in metadata, check HTML content
+        if not is_deepmind and link:
+            # Extract ID from link (http://arxiv.org/abs/2602.XXXXX)
+            # HTML URL format: https://arxiv.org/html/2602.XXXXX
             try:
-                pub_date = datetime.datetime.strptime(published_str, "%Y-%m-%dT%H:%M:%SZ")
-            except ValueError:
-                pass
-        
-        papers.append({
-            'title': title,
-            'link': link,
-            'description': summary,
-            'author': "Google DeepMind (ArXiv)",
-            'pubDate': pub_date,
-            'source': 'ArXiv'
-        })
-        
+                arxiv_id = link.split("/abs/")[-1]
+                # specific version might be included in ID (v1), usually link has it.
+                html_url = f"https://arxiv.org/html/{arxiv_id}"
+                
+                print(f"Checking HTML content for: {title} ({html_url})")
+                try:
+                    # Timeout to prevent hanging
+                    html_response = requests.get(html_url, timeout=10)
+                    if html_response.status_code == 200:
+                        # Check first 50KB or so to be safe/fast, usually affiliation is at top
+                        content_sample = html_response.text[:50000]
+                        if "Google DeepMind" in content_sample or "DeepMind" in content_sample:
+                            print(f"Found DeepMind in HTML content for: {title}")
+                            is_deepmind = True
+                except Exception as e:
+                    print(f"Failed to check HTML for {arxiv_id}: {e}")
+            except Exception as e:
+                print(f"Error parsing link {link}: {e}")
+
+        if is_deepmind:
+            published_elem = entry.find('atom:published', ns)
+            published_str = published_elem.text if published_elem is not None else ""
+            
+            pub_date = datetime.datetime.now()
+            if published_str:
+                try:
+                    pub_date = datetime.datetime.strptime(published_str, "%Y-%m-%dT%H:%M:%SZ")
+                except ValueError:
+                    pass
+            
+            papers.append({
+                'title': title,
+                'link': link,
+                'description': summary,
+                'author': "Google DeepMind (ArXiv)",
+                'pubDate': pub_date,
+                'source': 'ArXiv'
+            })
+            
     return papers
 
 def normalize_title(title):
